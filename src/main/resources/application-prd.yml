@@ -30,7 +30,7 @@ spring:
 
 # Discord bot token for local dev
 discord:
-  token: MTQ3NTUxODIwMzA0Mjk4ODE0NQ.GjI0zY._hPMGAxPPiH34MkdV4ikbCT2inhOAHV65rSw6A
+  token: ${DISCORD_TOKEN:}
 
 app:
   jwt:
