@@ -18,9 +18,6 @@ spring:
       ddl-auto: update
     show-sql: false
 
-# Discord bot configuration
-discord:
-  token: ${DISCORD_TOKEN:}
 
 # Lavalink audio server configuration
 lavalink:
