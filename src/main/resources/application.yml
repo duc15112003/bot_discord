@@ -1,0 +1,44 @@
+server:
+  port: 8083
+spring:
+  jmx:
+    enabled: false
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  application:
+    name: bot-discord-server
+  config:
+    import:
+      - optional:file:package-override.yaml
+      - optional:file:product-config.yaml
+      - optional:file:package-configuration-${spring.profiles.active}.json
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+# Discord bot configuration
+discord:
+  token: ${DISCORD_TOKEN:}
+
+# Lavalink audio server configuration
+lavalink:
+  nodes:
+    - uri: ${LAVALINK_URI:ws://localhost:2333}
+      password: ${LAVALINK_PASSWORD:youshallnotpass}
+      name: main-node
+
+logging:
+  level:
+    sun.rmi: WARN
+    javax.management.remote.rmi: WARN
+    root: INFO
+    org.springframework.boot.autoconfigure.logging.ConditionEvaluationReportLogger: OFF
+    org.apache.catalina.session: ERROR
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+

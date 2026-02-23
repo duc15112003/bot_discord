@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:bot_discord_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+# --- MySQL (uncomment for production) ---
+#spring:
+#  datasource:
+#    url: jdbc:mysql://localhost:3306/bot_discord_db
+#    username: root
+#    password: root
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#    show-sql: false
+
+# Discord bot token for local dev
+discord:
+  token: ${DISCORD_TOKEN:}
+
+app:
+  jwt:
+    secret: local-dev-jwt-secret-not-for-production
+    expiration: 3600000
+
+logging:
+  level:
+    root: DEBUG
+    com.discord: DEBUG
+    dev.arbjerg.lavalink: DEBUG

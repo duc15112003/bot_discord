@@ -1,0 +1,27 @@
+# Application Config Matrix
+# This file defines the mapping between environments and their configuration sources.
+# It serves as documentation for which configuration files apply to which profile.
+
+config:
+  matrix:
+    environments:
+      local:
+        profile: local
+        json-config: package-configuration-local.json
+        description: "Local development environment"
+      dev:
+        profile: dev
+        json-config: package-configuration-dev.json
+        description: "Development environment"
+      stg:
+        profile: stg
+        json-config: package-configuration-stg.json
+        description: "Staging environment"
+      prd:
+        profile: prd
+        json-config: package-configuration-prd.json
+        description: "Production environment"
+      tst:
+        profile: tst
+        json-config: package-configuration-tst.json
+        description: "Testing environment"

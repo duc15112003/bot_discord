@@ -1,0 +1,11 @@
+# Package Override Configuration
+# Maps JSON config values into Spring config namespace
+# Must NOT override secrets - secrets come only from environment variables
+
+app:
+  integration:
+    api-timeout-ms: ${integration.api-timeout-ms:5000}
+    retry-attempts: ${integration.retry-attempts:3}
+    vendor-url: ${integration.vendor-url:https://api.default.example.com}
+  features:
+    beta-enabled: ${features.beta-enabled:false}

@@ -1,0 +1,4 @@
+app:
+  features:
+    registration-enabled: true
+    max-users: 1000

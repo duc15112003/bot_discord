@@ -1,0 +1,42 @@
+name: Deployment CI/CD
+
+on:
+  push:
+    branches:
+      - main  # Change this to your default branch if it's different
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Cloud Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            if [ ! -d "${{ secrets.PROJECT_PATH }}" ]; then
+              mkdir -p ${{ secrets.PROJECT_PATH }}
+            fi
+            cd ${{ secrets.PROJECT_PATH }}
+            
+            if [ -d ".git" ]; then
+              echo "Pulling latest code..."
+              git pull origin main
+            else
+              echo "Cloning repository..."
+              git clone https://github.com/duc15112003/bot_discord.git 
+            fi
+            
+            echo "Starting/Restarting Docker Compose (Lavalink)..."
+            docker-compose up -d lavalink
+            
+            echo "Stopping old bot process if running..."
+            pkill -f "bootRun" || true
+            
+            echo "Running Spring Boot Application..."
+            chmod +x gradlew
+            nohup ./gradlew bootRun --args='--spring.profiles.active=prd' > bot.log 2>&1 &
+            
+            echo "Deployment triggered successfully!"
