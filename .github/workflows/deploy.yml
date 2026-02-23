@@ -14,7 +14,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SERVER_PASSWORD }}
           script: |
             if [ ! -d "${{ secrets.PROJECT_PATH }}" ]; then
               mkdir -p ${{ secrets.PROJECT_PATH }}
@@ -23,10 +23,11 @@ jobs:
             
             if [ -d ".git" ]; then
               echo "Pulling latest code..."
+              git remote set-url origin https://oauth2:${{ secrets.GIT_TOKEN }}@github.com/duc15112003/bot_discord.git
               git pull origin main
             else
               echo "Cloning repository..."
-              git clone https://github.com/duc15112003/bot_discord.git 
+              git clone https://oauth2:${{ secrets.GIT_TOKEN }}@github.com/duc15112003/bot_discord.git .
             fi
             
             echo "Starting/Restarting Docker Compose (Lavalink)..."
