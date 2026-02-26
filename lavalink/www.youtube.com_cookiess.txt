@@ -1,0 +1,11 @@
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.youtube.com	TRUE	/	TRUE	1772109260	CONSISTENCY	AAsGu9mLPjhW2qjE-zrjLvQaLIUp2tlVyE4yQ77eI_xcR0KkQLhAbY_PEzBXG4KXG_nR_PcM76niVc_Z1RP4-GsHOvNAj3ajiSPSk914uNhyZAe1qf-wu-O8wYOXdC8-HIQrxlKJM6e6JcaJ3xihJQNweS5AJGZMzflSmptzppJSYlqT8CBOfqN51cP2Sbtl0Emygr5sQIfYzyN8aVlfMbDPxPk
+.youtube.com	TRUE	/	TRUE	1787660769	PREF	tz=Asia.Bangkok&f7=100&repeat=NONE&autoplay=true
+.youtube.com	TRUE	/	TRUE	1772110518	GPS	1
+.youtube.com	TRUE	/	TRUE	1787660767	VISITOR_INFO1_LIVE	Z1nWP43iSVw
+.youtube.com	TRUE	/	TRUE	1787660767	VISITOR_PRIVACY_METADATA	CgJWThIEGgAgTQ%3D%3D
+.youtube.com	TRUE	/	TRUE	1787579591	__Secure-ROLLOUT_TOKEN	CLSvj4_pic29TRDm9a6o5cKSAxi-rsCZ5fSSAw%3D%3D
+.youtube.com	TRUE	/	TRUE	0	YSC	BSWfjDPO3GU

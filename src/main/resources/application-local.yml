@@ -28,6 +28,9 @@ spring:
 #      ddl-auto: update
 #    show-sql: false
 
+# Discord bot token for local dev
+discord:
+  token: ${DISCORD_TOKEN:}
 
 app:
   jwt:
