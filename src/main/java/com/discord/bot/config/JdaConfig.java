@@ -1,6 +1,7 @@
 package com.discord.bot.config;
 
 import com.discord.bot.music.command.CommandManager;
+import com.discord.bot.music.listener.AutoVoiceListener;
 import com.discord.bot.music.listener.VoiceChannelListener;
 import dev.arbjerg.lavalink.client.LavalinkClient;
 import dev.arbjerg.lavalink.libraries.jda.JDAVoiceUpdateListener;
@@ -29,6 +30,7 @@ public class JdaConfig {
         @Bean
         public JDA jda(CommandManager commandManager,
                         VoiceChannelListener voiceChannelListener,
+                        AutoVoiceListener autoVoiceListener,
                         LavalinkClient lavalinkClient) throws InterruptedException {
 
                 if (botToken == null || botToken.isBlank()) {
@@ -45,7 +47,8 @@ public class JdaConfig {
                                 .enableCache(CacheFlag.VOICE_STATE)
                                 .addEventListeners(
                                                 commandManager,
-                                                voiceChannelListener)
+                                                voiceChannelListener,
+                                                autoVoiceListener)
                                 .setVoiceDispatchInterceptor(new JDAVoiceUpdateListener(lavalinkClient))
                                 .build();
 
