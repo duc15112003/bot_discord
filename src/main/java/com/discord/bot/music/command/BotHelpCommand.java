@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -15,10 +16,10 @@ import java.awt.*;
 @Component
 public class BotHelpCommand implements SlashCommand {
 
-    private final CommandRegistry commandRegistry;
+    private final ObjectProvider<CommandRegistry> commandRegistryProvider;
 
-    public BotHelpCommand(CommandRegistry commandRegistry) {
-        this.commandRegistry = commandRegistry;
+    public BotHelpCommand(ObjectProvider<CommandRegistry> commandRegistryProvider) {
+        this.commandRegistryProvider = commandRegistryProvider;
     }
 
     @Override
@@ -33,6 +34,8 @@ public class BotHelpCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
+        CommandRegistry commandRegistry = commandRegistryProvider.getObject();
+
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle("🎵 Music Bot — Help")
                 .setColor(new Color(88, 101, 242)) // Discord Blurple
