@@ -54,6 +54,9 @@ public class MusicService {
         String searchQuery = query;
         if (!query.startsWith("http://") && !query.startsWith("https://")) {
             searchQuery = "ytsearch:" + query;
+        } else {
+            // Strip YouTube mix/radio parameters that cause lavaplayer issues
+            searchQuery = stripYoutubeMixParams(searchQuery);
         }
 
         try {
@@ -270,5 +273,24 @@ public class MusicService {
      */
     public TrackInfo getNowPlaying(long guildId) {
         return guildMusicManager.getQueue(guildId).getCurrentTrack();
+    }
+
+    /**
+     * Strip YouTube mix/radio parameters from URLs to avoid lavaplayer mix loading
+     * errors.
+     * Converts URLs like
+     * "https://www.youtube.com/watch?v=XXX&list=RDXXX&start_radio=1"
+     * into "https://www.youtube.com/watch?v=XXX"
+     */
+    private String stripYoutubeMixParams(String url) {
+        if (url.contains("youtube.com") || url.contains("youtu.be")) {
+            // Remove &list=RD... (radio/mix playlists) and &start_radio=...
+            url = url.replaceAll("[&?]list=RD[^&]*", "");
+            url = url.replaceAll("[&?]start_radio=[^&]*", "");
+            url = url.replaceAll("[&?]index=[^&]*", "");
+            // Fix URL if first param was removed (? became missing)
+            url = url.replaceAll("\\?&", "?");
+        }
+        return url;
     }
 }
