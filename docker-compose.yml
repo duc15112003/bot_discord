@@ -1,11 +1,32 @@
 services:
   lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4
+    # Lavalink v4.2.1 with DAVE (E2EE) support, alpine variant
+    image: ghcr.io/lavalink-devs/lavalink:4.2.1-alpine
     container_name: lavalink
     restart: unless-stopped
-    ports:
-      - "2333:2333"
-    volumes:
-      - ./lavalink/application.yml:/opt/Lavalink/application.yml
     environment:
+      # Java heap size for Lavalink (adjust if you have more/less RAM)
       - _JAVA_OPTIONS=-Xmx512m
+      # If you prefer configuring Lavalink via environment variables instead of application.yml,
+      # you can uncomment and adjust the lines below to match your bot config:
+      # - SERVER_PORT=2333
+      # - LAVALINK_SERVER_PASSWORD=youshallnotpass
+    volumes:
+      # Mount your Lavalink configuration file (includes password, plugins, etc.)
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml
+      # Persist plugins between restarts (optional but recommended for v4+)
+      - ./lavalink/plugins/:/opt/Lavalink/plugins/
+    networks:
+      - lavalink
+    expose:
+      # Internal port exposed to other containers
+      - 2333
+    ports:
+      # Public port (only needed if connecting from outside Docker)
+      - "2333:2333"
+      # To restrict to localhost only, you could instead use:
+      # - "127.0.0.1:2333:2333"
+
+networks:
+  lavalink:
+    name: lavalink
