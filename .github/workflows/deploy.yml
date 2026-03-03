@@ -39,6 +39,6 @@ jobs:
             echo "Running Spring Boot Application..."
             chmod +x gradlew
             export DISCORD_TOKEN="${{ secrets.DISCORD_TOKEN }}"
-            nohup ./gradlew bootRun --args='--spring.profiles.active=prd' > bot.log 2>&1 &
+            nohup ./gradlew bootRun --args='--spring.profiles.active=local' > bot.log 2>&1 &
             
             echo "Deployment triggered successfully!"
