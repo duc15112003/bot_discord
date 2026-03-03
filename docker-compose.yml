@@ -8,10 +8,8 @@ services:
       # Java heap size for Lavalink (adjust if you have more/less RAM)
       - _JAVA_OPTIONS=-Xmx512m
       - SERVER_PORT=2333
-      # If you prefer configuring Lavalink via environment variables instead of application.yml,
-      # you can uncomment and adjust the lines below to match your bot config:
-      # - SERVER_PORT=2333
-      # - LAVALINK_SERVER_PASSWORD=youshallnotpass
+      # Set password explicitly via env var (takes priority over application.yml)
+      - LAVALINK_SERVER_PASSWORD=youshallnotpass
     volumes:
       # Mount your Lavalink configuration file (includes password, plugins, etc.)
       - ./lavalink/application.yml:/opt/Lavalink/application.yml
