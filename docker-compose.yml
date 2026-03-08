@@ -30,14 +30,14 @@ services:
       # MySQL Database Server
       # ──────────────────────────────────────────────
   mysql:
-    image: mysql:8.0
+    image: mariadb:10.11
     container_name: mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: bot_discord_db
-      MYSQL_USER: bot_user
-      MYSQL_PASSWORD: bot_password
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: bot_discord_db
+      MARIADB_USER: bot_user
+      MARIADB_PASSWORD: bot_password
     ports:
       - "3306:3306"
     volumes:
@@ -45,21 +45,21 @@ services:
     networks:
       - mysql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot" ]
+      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-proot" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     command: >
-      --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
   # ──────────────────────────────────────────────
-  # MySQL CLI (rcon-cli style)
-  # Usage: docker compose run --rm mysql-cli
+  # Database CLI
+  # Usage: docker compose run --rm db-cli
   # ──────────────────────────────────────────────
-  mysql-cli:
-    image: mysql:8.0
-    container_name: mysql-cli
+  db-cli:
+    image: mariadb:10.11
+    container_name: db-cli
     profiles:
       - cli
     networks:
@@ -67,7 +67,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    entrypoint: mysql -hmysql -uroot -proot bot_discord_db
+    entrypoint: mariadb -hmysql -uroot -proot bot_discord_db
     stdin_open: true
     tty: true
 
