@@ -46,7 +46,8 @@ public class AutoVoiceCommand implements SlashCommand {
                         new SubcommandData("setup", "Configure a trigger channel for auto-voice (Admin)")
                                 .addOption(OptionType.CHANNEL, "trigger", "The voice channel to use as trigger", true)
                                 .addOption(OptionType.CHANNEL, "category", "Category to create temp channels in", false)
-                                .addOption(OptionType.INTEGER, "maxusers", "Maximum users per temp channel (0 = unlimited)", false),
+                                .addOption(OptionType.INTEGER, "maxusers",
+                                        "Maximum users per temp channel (0 = unlimited)", false),
                         new SubcommandData("remove", "Remove a trigger channel configuration (Admin)")
                                 .addOption(OptionType.CHANNEL, "trigger", "The trigger channel to remove", true),
                         new SubcommandData("list", "List all auto-voice trigger channels"),
@@ -56,8 +57,7 @@ public class AutoVoiceCommand implements SlashCommand {
                                 .addOption(OptionType.STRING, "name", "New name for your channel", true),
                         new SubcommandData("limit", "Set user limit for your temp voice channel (Owner only)")
                                 .addOption(OptionType.INTEGER, "max", "Maximum users (0 = unlimited)", true),
-                        new SubcommandData("info", "Show info about your current temp voice channel")
-                );
+                        new SubcommandData("info", "Show info about your current temp voice channel"));
     }
 
     @Override
@@ -139,10 +139,12 @@ public class AutoVoiceCommand implements SlashCommand {
 
             if (categoryId != null) {
                 var category = guild.getCategoryById(categoryId);
-                response.append("**Category:** ").append(category != null ? category.getName() : "Unknown").append("\n");
+                response.append("**Category:** ").append(category != null ? category.getName() : "Unknown")
+                        .append("\n");
             }
 
-            response.append("**Max Users:** ").append(maxUsers != null && maxUsers > 0 ? maxUsers : "Unlimited").append("\n\n")
+            response.append("**Max Users:** ").append(maxUsers != null && maxUsers > 0 ? maxUsers : "Unlimited")
+                    .append("\n\n")
                     .append("When users join the trigger channel, a temporary voice channel will be created for them.");
 
             event.reply(response.toString()).queue();
@@ -307,15 +309,17 @@ public class AutoVoiceCommand implements SlashCommand {
             var voiceChannel = (net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel) voiceState.getChannel();
             if (voiceChannel != null) {
                 voiceChannel.getManager()
-                        .putPermissionOverride(member, java.util.EnumSet.of(net.dv8tion.jda.api.Permission.VOICE_CONNECT),
+                        .putPermissionOverride(member,
+                                java.util.EnumSet.of(net.dv8tion.jda.api.Permission.VOICE_CONNECT),
                                 java.util.EnumSet.of(net.dv8tion.jda.api.Permission.VOICE_CONNECT))
                         .putPermissionOverride(guild.getPublicRole(),
                                 java.util.EnumSet.noneOf(net.dv8tion.jda.api.Permission.class),
                                 java.util.EnumSet.of(net.dv8tion.jda.api.Permission.VOICE_CONNECT))
                         .queue(
-                            success -> event.reply("🔒 Your channel has been locked. Only you can join now.").queue(),
-                            error -> event.reply("❌ Failed to lock channel: " + error.getMessage()).setEphemeral(true).queue()
-                        );
+                                success -> event.reply("🔒 Your channel has been locked. Only you can join now.")
+                                        .queue(),
+                                error -> event.reply("❌ Failed to lock channel: " + error.getMessage())
+                                        .setEphemeral(true).queue());
             }
         }
     }
@@ -436,9 +440,9 @@ public class AutoVoiceCommand implements SlashCommand {
             var voiceChannel = (net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel) voiceState.getChannel();
             if (voiceChannel != null) {
                 voiceChannel.getManager().setName(newName).queue(
-                    success -> event.reply("✏️ Channel renamed to **" + newName + "**").queue(),
-                    error -> event.reply("❌ Failed to rename channel: " + error.getMessage()).setEphemeral(true).queue()
-                );
+                        success -> event.reply("✏️ Channel renamed to **" + newName + "**").queue(),
+                        error -> event.reply("❌ Failed to rename channel: " + error.getMessage()).setEphemeral(true)
+                                .queue());
             }
         }
     }
@@ -500,12 +504,12 @@ public class AutoVoiceCommand implements SlashCommand {
             var voiceChannel = (net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel) voiceState.getChannel();
             if (voiceChannel != null) {
                 voiceChannel.getManager().setUserLimit(limit).queue(
-                    success -> {
-                        String limitText = limit > 0 ? String.valueOf(limit) : "unlimited";
-                        event.reply("👥 User limit set to **" + limitText + "**").queue();
-                    },
-                    error -> event.reply("❌ Failed to set user limit: " + error.getMessage()).setEphemeral(true).queue()
-                );
+                        success -> {
+                            String limitText = limit > 0 ? String.valueOf(limit) : "unlimited";
+                            event.reply("👥 User limit set to **" + limitText + "**").queue();
+                        },
+                        error -> event.reply("❌ Failed to set user limit: " + error.getMessage()).setEphemeral(true)
+                                .queue());
             }
         }
     }
@@ -555,8 +559,11 @@ public class AutoVoiceCommand implements SlashCommand {
                 // Database-stored channel
                 var tempChannel = tempChannelOpt.get();
                 response.append("**Locked:** ").append(tempChannel.getIsLocked() ? "Yes 🔒" : "No").append("\n")
-                        .append("**User Limit:** ").append(tempChannel.getUserLimit() > 0 ? tempChannel.getUserLimit() : "Unlimited").append("\n")
-                        .append("**Created:** <t:").append(tempChannel.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC)).append(":R>").append("\n\n");
+                        .append("**User Limit:** ")
+                        .append(tempChannel.getUserLimit() > 0 ? tempChannel.getUserLimit() : "Unlimited").append("\n")
+                        .append("**Created:** <t:")
+                        .append(tempChannel.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC)).append(":R>")
+                        .append("\n\n");
             } else {
                 // VoiceChannelListener-created channel
                 response.append("**Type:** Temporary Channel (Auto-created)\n")
@@ -574,7 +581,8 @@ public class AutoVoiceCommand implements SlashCommand {
             return;
         }
 
-        // Second try: Check if user owns a temp channel in database (fallback for offline/not in voice)
+        // Second try: Check if user owns a temp channel in database (fallback for
+        // offline/not in voice)
         var tempChannelOpt = autoVoiceService.getTempChannelByOwner(guild.getId(), member.getId());
 
         if (tempChannelOpt.isEmpty()) {
@@ -592,8 +600,10 @@ public class AutoVoiceCommand implements SlashCommand {
                 .append("**Channel:** ").append(channel != null ? channel.getAsMention() : "Deleted").append("\n")
                 .append("**Name:** ").append(tempChannel.getChannelName()).append("\n")
                 .append("**Locked:** ").append(tempChannel.getIsLocked() ? "Yes 🔒" : "No").append("\n")
-                .append("**User Limit:** ").append(tempChannel.getUserLimit() > 0 ? tempChannel.getUserLimit() : "Unlimited").append("\n")
-                .append("**Created:** <t:").append(tempChannel.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC)).append(":R>").append("\n\n")
+                .append("**User Limit:** ")
+                .append(tempChannel.getUserLimit() > 0 ? tempChannel.getUserLimit() : "Unlimited").append("\n")
+                .append("**Created:** <t:").append(tempChannel.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC))
+                .append(":R>").append("\n\n")
                 .append("**Commands:**\n")
                 .append("• `/autovoice lock` - Lock your channel\n")
                 .append("• `/autovoice unlock` - Unlock your channel\n")

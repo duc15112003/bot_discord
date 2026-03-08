@@ -40,8 +40,12 @@ public class PlaylistService {
             return "❌ No track is currently playing. Play a track first!";
         }
 
+        log.info("Attempting to add track '{}' to playlist '{}' for user {}", trackInfo.getTitle(), playlistName,
+                userId);
+
         Playlist playlist = playlistRepository.findByUserIdAndName(userId, playlistName)
                 .orElseGet(() -> {
+                    log.info("Playlist '{}' not found for user {}, creating new one.", playlistName, userId);
                     Playlist newPlaylist = Playlist.builder()
                             .userId(userId)
                             .name(playlistName)
@@ -60,9 +64,14 @@ public class PlaylistService {
                 .position(nextPosition)
                 .build();
 
-        playlistTrackRepository.save(track);
-
-        log.info("Added track '{}' to playlist '{}' for user {}", trackInfo.getTitle(), playlistName, userId);
+        try {
+            playlistTrackRepository.save(track);
+            log.info("Successfully saved track '{}' at position {} in playlist '{}'",
+                    trackInfo.getTitle(), nextPosition, playlistName);
+        } catch (Exception e) {
+            log.error("Failed to save track to database: {}", e.getMessage(), e);
+            return "❌ Error saving track to database: " + e.getMessage();
+        }
 
         return "✅ Added **" + trackInfo.getTitle() + "** to playlist **" + playlistName
                 + "** (Track #" + nextPosition + ")";
@@ -139,5 +148,15 @@ public class PlaylistService {
         }
 
         return "🗑️ Removed **" + trackTitle + "** from playlist **" + playlistName + "**.";
+    }
+
+    /**
+     * Get all tracks for a specific playlist.
+     */
+    @Transactional(readOnly = true)
+    public List<PlaylistTrack> getPlaylistTracks(String userId, String playlistName) {
+        return playlistRepository.findByUserIdAndName(userId, playlistName)
+                .map(playlist -> playlistTrackRepository.findByPlaylistIdOrderByPositionAsc(playlist.getId()))
+                .orElse(java.util.Collections.emptyList());
     }
 }

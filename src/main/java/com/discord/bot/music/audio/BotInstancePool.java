@@ -103,7 +103,20 @@ public class BotInstancePool {
     /**
      * Total number of bot instances.
      */
+    /**
+     * Total number of bot instances.
+     */
     public int getTotalCount() {
         return instances.size();
+    }
+
+    /**
+     * Get the primary bot instance.
+     */
+    public BotInstance getPrimaryBot() {
+        return instances.stream()
+                .filter(BotInstance::isPrimary)
+                .findFirst()
+                .orElse(instances.isEmpty() ? null : instances.get(0));
     }
 }

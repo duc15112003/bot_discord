@@ -26,9 +26,92 @@ public class MusicService {
     private static final Logger log = LoggerFactory.getLogger(MusicService.class);
 
     private final GuildMusicManager guildMusicManager;
+    private final PlaylistService playlistService;
 
-    public MusicService(GuildMusicManager guildMusicManager) {
+    public MusicService(GuildMusicManager guildMusicManager, PlaylistService playlistService) {
         this.guildMusicManager = guildMusicManager;
+        this.playlistService = playlistService;
+    }
+
+    /**
+     * Play all tracks from a stored playlist.
+     */
+    public String playPlaylist(Guild guild, Member member, String targetUserId, String playlistName) {
+        // Check if user is in a voice channel
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            return "❌ You must be in a voice channel to use this command!";
+        }
+
+        AudioChannelUnion channel = voiceState.getChannel();
+        long guildId = guild.getIdLong();
+        long channelId = channel.getIdLong();
+        String userId = member.getId();
+
+        // Get tracks from DB
+        List<com.discord.bot.music.entity.PlaylistTrack> dbTracks = playlistService.getPlaylistTracks(targetUserId,
+                playlistName);
+        if (dbTracks.isEmpty()) {
+            return "❌ Playlist **" + playlistName + "** is empty or does not exist.";
+        }
+
+        // Find or assign a bot
+        BotInstance bot = guildMusicManager.findOrAssignBot(guildId, channelId);
+        if (bot == null) {
+            return "❌ Tất cả bot đều đang bận! Hãy dùng `/stop` ở channel khác.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
+        Link link = bot.getLavalinkClient().getOrCreateLink(guildId);
+        bot.getJda().getDirectAudioController().connect(channel);
+
+        int addedCount = 0;
+        int failedCount = 0;
+
+        for (com.discord.bot.music.entity.PlaylistTrack dbTrack : dbTracks) {
+            try {
+                LavalinkLoadResult result = link.loadItem(dbTrack.getUri()).block();
+                if (result instanceof TrackLoaded trackLoaded) {
+                    Track track = trackLoaded.getTrack();
+                    TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, member.getEffectiveName());
+
+                    if (queue.getCurrentTrack() == null) {
+                        queue.setCurrentTrack(info);
+                        link.createOrUpdatePlayer()
+                                .setTrack(track)
+                                .setPaused(false)
+                                .subscribe();
+                    } else {
+                        queue.enqueue(info);
+                    }
+                    addedCount++;
+                } else if (result instanceof SearchResult searchResult && !searchResult.getTracks().isEmpty()) {
+                    Track track = searchResult.getTracks().get(0);
+                    TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, member.getEffectiveName());
+
+                    if (queue.getCurrentTrack() == null) {
+                        queue.setCurrentTrack(info);
+                        link.createOrUpdatePlayer()
+                                .setTrack(track)
+                                .setPaused(false)
+                                .subscribe();
+                    } else {
+                        queue.enqueue(info);
+                    }
+                    addedCount++;
+                } else {
+                    failedCount++;
+                }
+            } catch (Exception e) {
+                failedCount++;
+            }
+        }
+
+        String message = "🎶 Loaded **" + addedCount + "** tracks from playlist **" + playlistName + "**.";
+        if (failedCount > 0) {
+            message += " (" + failedCount + " tracks failed to load)";
+        }
+        return message;
     }
 
     /**
@@ -332,6 +415,13 @@ public class MusicService {
      */
     public TrackInfo getNowPlaying(long guildId, long channelId) {
         return guildMusicManager.getQueue(guildId, channelId).getCurrentTrack();
+    }
+
+    /**
+     * Get the guild music manager.
+     */
+    public GuildMusicManager getGuildMusicManager() {
+        return guildMusicManager;
     }
 
     /**
