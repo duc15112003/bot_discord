@@ -30,7 +30,7 @@ public class NextCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String result = musicService.next(event.getGuild());
+        String result = musicService.next(event.getGuild(), event.getMember());
         event.reply(result).queue();
     }
 }

@@ -30,7 +30,7 @@ public class ResumeCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String result = musicService.resume(event.getGuild());
+        String result = musicService.resume(event.getGuild(), event.getMember());
         event.reply(result).queue();
     }
 }

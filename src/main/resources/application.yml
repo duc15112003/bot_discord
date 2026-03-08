@@ -11,7 +11,7 @@ spring:
     import:
       - optional:file:package-override.yaml
       - optional:file:product-config.yaml
-      - optional:file:package-configuration-${spring.profiles.active}.json
+      - "optional:file:./package-configuration-${spring.profiles.active}.json"
   jpa:
     open-in-view: false
     hibernate:
@@ -19,6 +19,8 @@ spring:
     show-sql: false
 
 # Discord bot configuration
+discord:
+  extra-tokens: ${DISCORD_EXTRA_TOKENS:}
 
 # Lavalink audio server configuration
 lavalink:

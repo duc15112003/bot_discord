@@ -40,7 +40,15 @@ public class PlaylistAddCommand implements SlashCommand {
         String userId = event.getUser().getId();
         long guildId = event.getGuild().getIdLong();
 
-        TrackInfo nowPlaying = musicService.getNowPlaying(guildId);
+        // Get channel from user's voice state
+        net.dv8tion.jda.api.entities.GuildVoiceState voiceState = event.getMember().getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            event.reply("❌ You must be in a voice channel to use this command!").queue();
+            return;
+        }
+        long channelId = voiceState.getChannel().getIdLong();
+
+        TrackInfo nowPlaying = musicService.getNowPlaying(guildId, channelId);
         String result = playlistService.addTrack(userId, playlistName, nowPlaying);
 
         event.reply(result).queue();

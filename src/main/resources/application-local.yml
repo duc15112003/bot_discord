@@ -1,44 +1,31 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:bot_discord_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: ${env.datasource.url}
+    username: ${env.datasource.username}
+    password: ${env.datasource.password}
+    driver-class-name: ${env.datasource.driver-class-name}
   h2:
     console:
-      enabled: true
-      path: /h2-console
+      enabled: ${env.h2.console.enabled:true}
+      path: ${env.h2.console.path:/h2-console}
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: true
+      ddl-auto: ${env.jpa.ddl-auto}
+    show-sql: ${env.jpa.show-sql:false}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${env.jpa.format_sql:false}
 
-# --- MySQL (uncomment for production) ---
-#spring:
-#  datasource:
-#    url: jdbc:mysql://localhost:3306/bot_discord_db
-#    username: root
-#    password: root
-#    driver-class-name: com.mysql.cj.jdbc.Driver
-#  jpa:
-#    hibernate:
-#      ddl-auto: update
-#    show-sql: false
-
-# Discord bot token for local dev
 discord:
-  token: MTQ3Njk2NTk5MTIyNDQ0NzA5OA.GgIP6W.mOwUK3rcb-q32_Z2yBtbtRqgeulYiUHO9k9Bu4
-
+  token: ${env.discord.token}
+  extra-tokens: ${env.discord.extra-token-1:},${env.discord.extra-token-2:},${env.discord.extra-token-3:}
 app:
   jwt:
-    secret: local-dev-jwt-secret-not-for-production
-    expiration: 3600000
+    secret: ${env.jwt.secret}
+    expiration: ${env.jwt.expiration:3600000}
 
 logging:
   level:
-    root: DEBUG
-    com.discord: DEBUG
-    dev.arbjerg.lavalink: DEBUG
+    root: ${env.logging.root:INFO}
+    com.discord: ${env.logging.com-discord:INFO}
+    dev.arbjerg.lavalink: ${env.logging.lavalink:INFO}

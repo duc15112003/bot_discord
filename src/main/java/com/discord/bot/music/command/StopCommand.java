@@ -30,7 +30,7 @@ public class StopCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        String result = musicService.stop(event.getGuild());
+        String result = musicService.stop(event.getGuild(), event.getMember());
         event.reply(result).queue();
     }
 }

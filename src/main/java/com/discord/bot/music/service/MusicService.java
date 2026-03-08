@@ -1,5 +1,6 @@
 package com.discord.bot.music.service;
 
+import com.discord.bot.music.audio.BotInstance;
 import com.discord.bot.music.audio.GuildMusicManager;
 import com.discord.bot.music.model.GuildMusicQueue;
 import com.discord.bot.music.model.TrackInfo;
@@ -17,7 +18,7 @@ import java.util.List;
 
 /**
  * Core music service orchestrating all playback operations.
- * Uses Lavalink for audio processing and GuildMusicManager for state.
+ * Supports multi-bot: assigns an available bot instance to each voice channel.
  */
 @Service
 public class MusicService {
@@ -32,8 +33,6 @@ public class MusicService {
 
     /**
      * Load and play a track or add it to the queue.
-     *
-     * @return a message describing the result
      */
     public String play(Guild guild, Member member, String query) {
         // Check if user is in a voice channel
@@ -44,38 +43,46 @@ public class MusicService {
 
         AudioChannelUnion channel = voiceState.getChannel();
         long guildId = guild.getIdLong();
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId);
-        Link link = guildMusicManager.getLink(guildId);
+        long channelId = channel.getIdLong();
 
-        // Join voice channel using DirectAudioController (required for Lavalink)
-        guild.getJDA().getDirectAudioController().connect(channel);
+        // Find or assign a bot to this channel
+        BotInstance bot = guildMusicManager.findOrAssignBot(guildId, channelId);
+        if (bot == null) {
+            int total = guildMusicManager.getBotPool().getTotalCount();
+            return "❌ Tất cả bot đều đang bận! (" + total + "/" + total + " đang phát nhạc). "
+                    + "Hãy dùng `/stop` ở channel khác hoặc invite thêm bot bằng `/invite`.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
+        Link link = bot.getLavalinkClient().getOrCreateLink(guildId);
+
+        // Join voice channel using the assigned bot's JDA
+        bot.getJda().getDirectAudioController().connect(channel);
 
         // Determine search prefix
         String searchQuery = query;
         if (!query.startsWith("http://") && !query.startsWith("https://")) {
             searchQuery = "ytsearch:" + query;
         } else {
-            // Strip YouTube mix/radio parameters that cause lavaplayer issues
             searchQuery = stripYoutubeMixParams(searchQuery);
         }
 
         try {
-            // Load the track synchronously (called from async context)
             LavalinkLoadResult result = link.loadItem(searchQuery).block();
 
             if (result == null) {
                 return "❌ Failed to load track. Please try again.";
             }
 
-            return handleLoadResult(result, queue, link, guildId, member);
+            return handleLoadResult(result, queue, link, guildId, channelId, member);
         } catch (Exception e) {
-            log.error("Error loading track for guild {}: {}", guildId, e.getMessage(), e);
+            log.error("Error loading track for guild {} channel {}: {}", guildId, channelId, e.getMessage(), e);
             return "❌ Error loading track: " + e.getMessage();
         }
     }
 
     private String handleLoadResult(LavalinkLoadResult result, GuildMusicQueue queue,
-            Link link, long guildId, Member member) {
+            Link link, long guildId, long channelId, Member member) {
         String userId = member.getId();
         String userName = member.getEffectiveName();
 
@@ -84,7 +91,6 @@ public class MusicService {
             TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, userName);
 
             if (queue.getCurrentTrack() == null) {
-                // Nothing playing, start immediately
                 queue.setCurrentTrack(info);
                 link.createOrUpdatePlayer()
                         .setTrack(track)
@@ -125,7 +131,6 @@ public class MusicService {
                 return "❌ No results found for your search.";
             }
 
-            // Take the first result
             Track track = tracks.get(0);
             TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, userName);
 
@@ -152,21 +157,31 @@ public class MusicService {
     /**
      * Stop playback, clear queue, disconnect from voice.
      */
-    public String stop(Guild guild) {
-        long guildId = guild.getIdLong();
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId);
+    public String stop(Guild guild, Member member) {
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            return "❌ You must be in a voice channel to use this command!";
+        }
 
+        long guildId = guild.getIdLong();
+        long channelId = voiceState.getChannel().getIdLong();
+
+        BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
+        if (bot == null) {
+            return "❌ No bot is playing in your channel.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         queue.clear();
         queue.setCurrentTrack(null);
 
-        guildMusicManager.getLink(guildId)
+        bot.getLavalinkClient().getOrCreateLink(guildId)
                 .createOrUpdatePlayer()
                 .setTrack(null)
                 .subscribe();
 
-        // Disconnect using DirectAudioController (required for Lavalink)
-        guild.getJDA().getDirectAudioController().disconnect(guild);
-        guildMusicManager.cleanup(guildId);
+        bot.getJda().getDirectAudioController().disconnect(guild);
+        guildMusicManager.cleanup(guildId, channelId);
 
         return "⏹️ Stopped playback and cleared the queue.";
     }
@@ -174,14 +189,25 @@ public class MusicService {
     /**
      * Skip to the next track in queue.
      */
-    public String next(Guild guild) {
-        long guildId = guild.getIdLong();
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId);
+    public String next(Guild guild, Member member) {
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            return "❌ You must be in a voice channel to use this command!";
+        }
 
+        long guildId = guild.getIdLong();
+        long channelId = voiceState.getChannel().getIdLong();
+
+        BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
+        if (bot == null) {
+            return "❌ No bot is playing in your channel.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         TrackInfo next = queue.dequeue();
         if (next == null) {
             queue.setCurrentTrack(null);
-            guildMusicManager.getLink(guildId)
+            bot.getLavalinkClient().getOrCreateLink(guildId)
                     .createOrUpdatePlayer()
                     .setTrack(null)
                     .subscribe();
@@ -189,7 +215,7 @@ public class MusicService {
         }
 
         queue.setCurrentTrack(next);
-        guildMusicManager.getLink(guildId)
+        bot.getLavalinkClient().getOrCreateLink(guildId)
                 .createOrUpdatePlayer()
                 .setTrack(next.getLavalinkTrack())
                 .setPaused(false)
@@ -201,17 +227,28 @@ public class MusicService {
     /**
      * Play the previous track from history.
      */
-    public String previous(Guild guild) {
-        long guildId = guild.getIdLong();
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId);
+    public String previous(Guild guild, Member member) {
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            return "❌ You must be in a voice channel to use this command!";
+        }
 
+        long guildId = guild.getIdLong();
+        long channelId = voiceState.getChannel().getIdLong();
+
+        BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
+        if (bot == null) {
+            return "❌ No bot is playing in your channel.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         TrackInfo prev = queue.popFromHistory();
         if (prev == null) {
             return "⏮️ No previous tracks in history.";
         }
 
         queue.setCurrentTrack(prev);
-        guildMusicManager.getLink(guildId)
+        bot.getLavalinkClient().getOrCreateLink(guildId)
                 .createOrUpdatePlayer()
                 .setTrack(prev.getLavalinkTrack())
                 .setPaused(false)
@@ -223,10 +260,21 @@ public class MusicService {
     /**
      * Pause the current track.
      */
-    public String pause(Guild guild) {
-        long guildId = guild.getIdLong();
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId);
+    public String pause(Guild guild, Member member) {
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            return "❌ You must be in a voice channel to use this command!";
+        }
 
+        long guildId = guild.getIdLong();
+        long channelId = voiceState.getChannel().getIdLong();
+
+        BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
+        if (bot == null) {
+            return "❌ No bot is playing in your channel.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         if (queue.getCurrentTrack() == null) {
             return "❌ Nothing is playing right now.";
         }
@@ -236,7 +284,7 @@ public class MusicService {
         }
 
         queue.setPaused(true);
-        guildMusicManager.getLink(guildId)
+        bot.getLavalinkClient().getOrCreateLink(guildId)
                 .createOrUpdatePlayer()
                 .setPaused(true)
                 .subscribe();
@@ -247,10 +295,21 @@ public class MusicService {
     /**
      * Resume playback.
      */
-    public String resume(Guild guild) {
-        long guildId = guild.getIdLong();
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId);
+    public String resume(Guild guild, Member member) {
+        GuildVoiceState voiceState = member.getVoiceState();
+        if (voiceState == null || !voiceState.inAudioChannel()) {
+            return "❌ You must be in a voice channel to use this command!";
+        }
 
+        long guildId = guild.getIdLong();
+        long channelId = voiceState.getChannel().getIdLong();
+
+        BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
+        if (bot == null) {
+            return "❌ No bot is playing in your channel.";
+        }
+
+        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         if (queue.getCurrentTrack() == null) {
             return "❌ Nothing is playing right now.";
         }
@@ -260,7 +319,7 @@ public class MusicService {
         }
 
         queue.setPaused(false);
-        guildMusicManager.getLink(guildId)
+        bot.getLavalinkClient().getOrCreateLink(guildId)
                 .createOrUpdatePlayer()
                 .setPaused(false)
                 .subscribe();
@@ -271,24 +330,18 @@ public class MusicService {
     /**
      * Get the currently playing track info.
      */
-    public TrackInfo getNowPlaying(long guildId) {
-        return guildMusicManager.getQueue(guildId).getCurrentTrack();
+    public TrackInfo getNowPlaying(long guildId, long channelId) {
+        return guildMusicManager.getQueue(guildId, channelId).getCurrentTrack();
     }
 
     /**
-     * Strip YouTube mix/radio parameters from URLs to avoid lavaplayer mix loading
-     * errors.
-     * Converts URLs like
-     * "https://www.youtube.com/watch?v=XXX&list=RDXXX&start_radio=1"
-     * into "https://www.youtube.com/watch?v=XXX"
+     * Strip YouTube mix/radio parameters from URLs.
      */
     private String stripYoutubeMixParams(String url) {
         if (url.contains("youtube.com") || url.contains("youtu.be")) {
-            // Remove &list=RD... (radio/mix playlists) and &start_radio=...
             url = url.replaceAll("[&?]list=RD[^&]*", "");
             url = url.replaceAll("[&?]start_radio=[^&]*", "");
             url = url.replaceAll("[&?]index=[^&]*", "");
-            // Fix URL if first param was removed (? became missing)
             url = url.replaceAll("\\?&", "?");
         }
         return url;
