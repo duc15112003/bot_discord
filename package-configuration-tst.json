@@ -1,0 +1,35 @@
+{
+    "profile": "tst",
+    "description": "Testing environment",
+    "env": {
+        "datasource": {
+            "url": "jdbc:h2:mem:bot_discord_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+            "username": "sa",
+            "password": "",
+            "driver-class-name": "org.h2.Driver"
+        },
+        "h2": {
+            "console": {
+                "enabled": true,
+                "path": "/h2-console"
+            }
+        },
+        "jpa": {
+            "ddl-auto": "create-drop",
+            "show-sql": true,
+            "format_sql": true
+        },
+        "discord": {
+            "token": "MTQ3Njk2NTk5MTIyNDQ0NzA5OA.GgIP6W.mOwUK3rcb-q32_Z2yBtbtRqgeulYiUHO9k9Bu4"
+        },
+        "jwt": {
+            "secret": "tst-jwt-secret-not-for-production",
+            "expiration": 3600000
+        },
+        "logging": {
+            "root": "DEBUG",
+            "com-discord": "DEBUG",
+            "lavalink": "DEBUG"
+        }
+    }
+}

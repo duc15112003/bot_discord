@@ -1,0 +1,32 @@
+{
+    "profile": "prd",
+    "description": "Production environment",
+    "env": {
+        "datasource": {
+            "url": "jdbc:mysql://localhost:3306/bot_discord_db?createDatabaseIfNotExist=true",
+            "username": "bot_user",
+            "password": "bot_password",
+            "driver-class-name": "com.mysql.cj.jdbc.Driver"
+        },
+        "jpa": {
+            "ddl-auto": "update",
+            "show-sql": false,
+            "format_sql": false
+        },
+        "discord": {
+            "token": "MTQ3Njk2NTk5MTIyNDQ0NzA5OA.GCJsSk.zgzHb_l-oKRfa_yxLEUaa9iljK-XiaWQKa2FzE",
+            "extra-token-1": "MTQ4MDA3OTkwNjYwMjc0NjExOA.Gn6UoH.ghKBOPzOllqGcVruQ8yZj8msznXW9uQ9IR6jLE",
+            "extra-token-2": "MTQ4MDA4MDA2NzIwMjY1MDIyNA.GKl7gI.HvjyM3mzFYGX1SwF0XnXSDx6m67OzBrqH5f_Ac",
+            "extra-token-3": "MTQ4MDA4MDI0MzU0Mzc2OTIwOQ.GhoeDx.YVhngY7GXQUQUh9iZYJn-wNFvgqOA832xeHtjA"
+        },
+        "jwt": {
+            "secret": "prd-jwt-secret-not-for-production",
+            "expiration": 3600000
+        },
+        "logging": {
+            "root": "INFO",
+            "com-discord": "INFO",
+            "lavalink": "INFO"
+        }
+    }
+}
