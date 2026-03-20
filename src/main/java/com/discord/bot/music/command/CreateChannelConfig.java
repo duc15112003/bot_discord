@@ -1,27 +1,42 @@
 package com.discord.bot.music.command;
 
+import com.discord.bot.music.entity.CreateChannelSetting;
+import com.discord.bot.music.repository.CreateChannelSettingRepository;
 import org.springframework.stereotype.Component;
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Stores create channel configuration per guild.
- * Maps guildId -> createChannelId
+ * Persisted in the database so it survives restarts.
  */
 @Component
 public class CreateChannelConfig {
-    private final Map<Long, Long> guildCreateChannels = new HashMap<>();
+    private final CreateChannelSettingRepository repository;
 
+    public CreateChannelConfig(CreateChannelSettingRepository repository) {
+        this.repository = repository;
+    }
+
+    @Transactional
     public void setCreateChannelId(long guildId, long channelId) {
-        guildCreateChannels.put(guildId, channelId);
+        CreateChannelSetting setting = repository.findByGuildId(guildId)
+                .orElseGet(() -> CreateChannelSetting.builder()
+                        .guildId(guildId)
+                        .build());
+        setting.setChannelId(channelId);
+        repository.save(setting);
     }
 
+    @Transactional(readOnly = true)
     public long getCreateChannelId(long guildId) {
-        return guildCreateChannels.getOrDefault(guildId, -1L);
+        return repository.findByGuildId(guildId)
+                .map(CreateChannelSetting::getChannelId)
+                .orElse(-1L);
     }
 
+    @Transactional(readOnly = true)
     public boolean hasCreateChannel(long guildId) {
-        return guildCreateChannels.containsKey(guildId);
+        return repository.existsByGuildId(guildId);
     }
 }
 

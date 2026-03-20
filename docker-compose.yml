@@ -13,6 +13,8 @@ services:
     volumes:
       # Mount your Lavalink configuration file (includes password, plugins, etc.)
       - ./lavalink/application.yml:/opt/Lavalink/application.yml
+      # Mount YouTube cookies for age/login-restricted content
+      - ./lavalink/www.youtube.com_cookies.txt:/opt/Lavalink/www.youtube.com_cookies.txt:ro
       # Persist plugins between restarts (optional but recommended for v4+)
       - ./lavalink/plugins/:/opt/Lavalink/plugins/
     networks:
@@ -34,18 +36,18 @@ services:
     container_name: mysql
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: root
+      MARIADB_ROOT_PASSWORD: secure_root_password_here
       MARIADB_DATABASE: bot_discord_db
       MARIADB_USER: bot_user
       MARIADB_PASSWORD: bot_password
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./data/mysql:/var/lib/mysql
     networks:
       - mysql
     healthcheck:
-      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-proot" ]
+      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-psecure_root_password_here" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,7 +69,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    entrypoint: mariadb -hmysql -uroot -proot bot_discord_db
+    entrypoint: mariadb -hmysql -uroot -psecure_root_password_here bot_discord_db
     stdin_open: true
     tty: true
 
@@ -77,6 +79,3 @@ networks:
   mysql:
     name: mysql
 
-volumes:
-  mysql_data:
-    name: bot_discord_mysql_data
