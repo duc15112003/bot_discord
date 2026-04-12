@@ -5,6 +5,8 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +14,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class PlayCommand implements SlashCommand {
+
+    private static final Logger log = LoggerFactory.getLogger(PlayCommand.class);
 
     private final MusicService musicService;
 
@@ -32,11 +36,18 @@ public class PlayCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        event.deferReply().queue();
-
         String query = event.getOption("query").getAsString();
-        String result = musicService.play(event.getGuild(), event.getMember(), query);
-
-        event.getHook().sendMessage(result).queue();
+        event.deferReply().queue(
+                hook -> musicService.playAsync(event.getGuild(), event.getMember(), query)
+                        .subscribe(
+                                message -> hook.sendMessage(message).queue(),
+                                error -> {
+                                    log.error("Unhandled async error for /play in guild {}: {}",
+                                            event.getGuild() != null ? event.getGuild().getId() : "dm",
+                                            error.getMessage(), error);
+                                    hook.sendMessage("❌ An unexpected error occurred while loading audio.").queue();
+                                }),
+                error -> log.error("Failed to acknowledge /play interaction {}: {}",
+                        event.getId(), error.getMessage(), error));
     }
 }

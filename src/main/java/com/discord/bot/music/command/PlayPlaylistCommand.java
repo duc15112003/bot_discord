@@ -7,6 +7,8 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class PlayPlaylistCommand implements SlashCommand {
+
+    private static final Logger log = LoggerFactory.getLogger(PlayPlaylistCommand.class);
 
     private final MusicService musicService;
 
@@ -36,23 +40,30 @@ public class PlayPlaylistCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        event.deferReply().queue();
-
         OptionMapping nameOption = event.getOption("name");
         OptionMapping userOption = event.getOption("user");
 
         if (nameOption == null) {
-            event.getHook().sendMessage("❌ Please provide a playlist name.").queue();
+            event.reply("❌ Please provide a playlist name.").setEphemeral(true).queue();
             return;
         }
 
         String playlistName = nameOption.getAsString();
         User targetUser = userOption != null ? userOption.getAsUser() : event.getUser();
 
-        // Pass the target user ID to MusicService
-        String result = musicService.playPlaylist(event.getGuild(), event.getMember(), targetUser.getId(),
-                playlistName);
-
-        event.getHook().sendMessage(result).queue();
+        event.deferReply().queue(
+                hook -> musicService.playPlaylistAsync(event.getGuild(), event.getMember(), targetUser.getId(),
+                        playlistName)
+                        .subscribe(
+                                message -> hook.sendMessage(message).queue(),
+                                error -> {
+                                    log.error("Unhandled async error for /play-playlist in guild {}: {}",
+                                            event.getGuild() != null ? event.getGuild().getId() : "dm",
+                                            error.getMessage(), error);
+                                    hook.sendMessage("❌ An unexpected error occurred while loading the playlist.")
+                                            .queue();
+                                }),
+                error -> log.error("Failed to acknowledge /play-playlist interaction {}: {}",
+                        event.getId(), error.getMessage(), error));
     }
 }

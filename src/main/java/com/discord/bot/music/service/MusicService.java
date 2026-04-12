@@ -5,7 +5,13 @@ import com.discord.bot.music.audio.GuildMusicManager;
 import com.discord.bot.music.model.GuildMusicQueue;
 import com.discord.bot.music.model.TrackInfo;
 import dev.arbjerg.lavalink.client.Link;
-import dev.arbjerg.lavalink.client.player.*;
+import dev.arbjerg.lavalink.client.player.LavalinkLoadResult;
+import dev.arbjerg.lavalink.client.player.LoadFailed;
+import dev.arbjerg.lavalink.client.player.PlaylistLoaded;
+import dev.arbjerg.lavalink.client.player.SearchResult;
+import dev.arbjerg.lavalink.client.player.Track;
+import dev.arbjerg.lavalink.client.player.TrackException;
+import dev.arbjerg.lavalink.client.player.TrackLoaded;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
@@ -13,17 +19,25 @@ import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Core music service orchestrating all playback operations.
- * Supports multi-bot: assigns an available bot instance to each voice channel.
+ * Core music service orchestrating playback operations.
+ * The load path is fully non-blocking so slash command acknowledgement does not
+ * wait on Lavalink.
  */
 @Service
 public class MusicService {
 
     private static final Logger log = LoggerFactory.getLogger(MusicService.class);
+    private static final Duration LAVALINK_LOAD_TIMEOUT = Duration.ofSeconds(10);
 
     private final GuildMusicManager guildMusicManager;
     private final PlaylistService playlistService;
@@ -34,207 +48,257 @@ public class MusicService {
     }
 
     /**
-     * Play all tracks from a stored playlist.
+     * Load and play a track or add it to the queue.
      */
-    public String playPlaylist(Guild guild, Member member, String targetUserId, String playlistName) {
-        // Check if user is in a voice channel
-        GuildVoiceState voiceState = member.getVoiceState();
-        if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+    public Mono<String> playAsync(Guild guild, Member member, String query) {
+        PlaybackContext context = validatePlaybackContext(guild, member);
+        if (context.failureMessage() != null) {
+            return Mono.just(context.failureMessage());
         }
 
-        AudioChannelUnion channel = voiceState.getChannel();
-        long guildId = guild.getIdLong();
-        long channelId = channel.getIdLong();
-        String userId = member.getId();
+        BotInstance bot = context.bot();
+        GuildMusicQueue queue = context.queue();
+        Link link = context.link();
+        long guildId = context.guildId();
+        long channelId = context.channelId();
 
-        // Get tracks from DB
-        List<com.discord.bot.music.entity.PlaylistTrack> dbTracks = playlistService.getPlaylistTracks(targetUserId,
-                playlistName);
-        if (dbTracks.isEmpty()) {
-            return "❌ Playlist **" + playlistName + "** is empty or does not exist.";
-        }
+        bot.getJda().getDirectAudioController().connect(context.channel());
 
-        // Find or assign a bot
-        BotInstance bot = guildMusicManager.findOrAssignBot(guildId, channelId);
-        if (bot == null) {
-            return "❌ Tất cả bot đều đang bận! Hãy dùng `/stop` ở channel khác.";
-        }
-
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
-        Link link = bot.getLavalinkClient().getOrCreateLink(guildId);
-        bot.getJda().getDirectAudioController().connect(channel);
-
-        int addedCount = 0;
-        int failedCount = 0;
-
-        for (com.discord.bot.music.entity.PlaylistTrack dbTrack : dbTracks) {
-            try {
-                LavalinkLoadResult result = link.loadItem(dbTrack.getUri()).block();
-                if (result instanceof TrackLoaded trackLoaded) {
-                    Track track = trackLoaded.getTrack();
-                    TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, member.getEffectiveName());
-
-                    if (queue.getCurrentTrack() == null) {
-                        queue.setCurrentTrack(info);
-                        link.createOrUpdatePlayer()
-                                .setTrack(track)
-                                .setPaused(false)
-                                .subscribe();
-                    } else {
-                        queue.enqueue(info);
+        return link.loadItem(normalizeQuery(query))
+                .timeout(LAVALINK_LOAD_TIMEOUT)
+                .map(result -> {
+                    if (result == null) {
+                        return "❌ Failed to load track. Please try again.";
                     }
-                    addedCount++;
-                } else if (result instanceof SearchResult searchResult && !searchResult.getTracks().isEmpty()) {
-                    Track track = searchResult.getTracks().get(0);
-                    TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, member.getEffectiveName());
-
-                    if (queue.getCurrentTrack() == null) {
-                        queue.setCurrentTrack(info);
-                        link.createOrUpdatePlayer()
-                                .setTrack(track)
-                                .setPaused(false)
-                                .subscribe();
-                    } else {
-                        queue.enqueue(info);
-                    }
-                    addedCount++;
-                } else {
-                    failedCount++;
-                }
-            } catch (Exception e) {
-                failedCount++;
-            }
-        }
-
-        String message = "🎶 Loaded **" + addedCount + "** tracks from playlist **" + playlistName + "**.";
-        if (failedCount > 0) {
-            message += " (" + failedCount + " tracks failed to load)";
-        }
-        return message;
+                    return handleLoadResult(result, queue, link, guildId, member);
+                })
+                .onErrorResume(error -> {
+                    log.error("Error loading track for guild {} channel {}: {}", guildId, channelId,
+                            error.getMessage(), error);
+                    return Mono.just("❌ Error loading track: " + userFriendlyErrorMessage(error));
+                });
     }
 
     /**
-     * Load and play a track or add it to the queue.
+     * Play all tracks from a stored playlist without blocking the interaction
+     * thread.
      */
-    public String play(Guild guild, Member member, String query) {
-        // Check if user is in a voice channel
+    public Mono<String> playPlaylistAsync(Guild guild, Member member, String targetUserId, String playlistName) {
+        PlaybackContext context = validatePlaybackContext(guild, member);
+        if (context.failureMessage() != null) {
+            return Mono.just(context.failureMessage());
+        }
+
+        List<com.discord.bot.music.entity.PlaylistTrack> dbTracks = playlistService.getPlaylistTracks(targetUserId,
+                playlistName);
+        if (dbTracks.isEmpty()) {
+            return Mono.just("❌ Playlist **" + playlistName + "** is empty or does not exist.");
+        }
+
+        BotInstance bot = context.bot();
+        GuildMusicQueue queue = context.queue();
+        Link link = context.link();
+        long guildId = context.guildId();
+        long channelId = context.channelId();
+        String requesterId = member.getId();
+        String requesterName = member.getEffectiveName();
+
+        bot.getJda().getDirectAudioController().connect(context.channel());
+
+        return Flux.fromIterable(dbTracks)
+                .concatMap(dbTrack -> link.loadItem(dbTrack.getUri())
+                        .timeout(LAVALINK_LOAD_TIMEOUT)
+                        .map(result -> processStoredTrackLoadResult(result, queue, link, guildId,
+                                requesterId, requesterName))
+                        .onErrorResume(error -> {
+                            log.warn("Failed to load saved track '{}' for guild {} channel {}: {}",
+                                    dbTrack.getUri(), guildId, channelId, error.getMessage());
+                            return Mono.just(false);
+                        }), 1)
+                .reduce(new PlaylistLoadSummary(), (summary, loaded) -> {
+                    summary.record(loaded);
+                    return summary;
+                })
+                .map(summary -> summary.toMessage(playlistName))
+                .onErrorResume(error -> {
+                    log.error("Unexpected error loading playlist '{}' for guild {} channel {}: {}",
+                            playlistName, guildId, channelId, error.getMessage(), error);
+                    return Mono.just("❌ Error loading playlist: " + userFriendlyErrorMessage(error));
+                });
+    }
+
+    private PlaybackContext validatePlaybackContext(Guild guild, Member member) {
+        if (guild == null || member == null) {
+            return PlaybackContext.failure("❌ This command can only be used inside a server.");
+        }
+
         GuildVoiceState voiceState = member.getVoiceState();
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+            return PlaybackContext.failure("❌ You must be in a voice channel to use this command.");
         }
 
         AudioChannelUnion channel = voiceState.getChannel();
         long guildId = guild.getIdLong();
         long channelId = channel.getIdLong();
 
-        // Find or assign a bot to this channel
         BotInstance bot = guildMusicManager.findOrAssignBot(guildId, channelId);
         if (bot == null) {
             int total = guildMusicManager.getBotPool().getTotalCount();
-            return "❌ Tất cả bot đều đang bận! (" + total + "/" + total + " đang phát nhạc). "
-                    + "Hãy dùng `/stop` ở channel khác hoặc invite thêm bot bằng `/invite`.";
+            return PlaybackContext.failure("❌ No available bot instance right now (" + total + "/" + total
+                    + " in use). Stop playback in another channel or invite another bot.");
         }
 
-        GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
-        Link link = bot.getLavalinkClient().getOrCreateLink(guildId);
-
-        // Join voice channel using the assigned bot's JDA
-        bot.getJda().getDirectAudioController().connect(channel);
-
-        // Determine search prefix
-        String searchQuery = query;
-        if (!query.startsWith("http://") && !query.startsWith("https://")) {
-            searchQuery = "ytsearch:" + query;
-        } else {
-            searchQuery = stripYoutubeMixParams(searchQuery);
-        }
-
-        try {
-            LavalinkLoadResult result = link.loadItem(searchQuery).block();
-
-            if (result == null) {
-                return "❌ Failed to load track. Please try again.";
-            }
-
-            return handleLoadResult(result, queue, link, guildId, channelId, member);
-        } catch (Exception e) {
-            log.error("Error loading track for guild {} channel {}: {}", guildId, channelId, e.getMessage(), e);
-            return "❌ Error loading track: " + e.getMessage();
-        }
+        return PlaybackContext.success(guildId, channelId, channel, bot,
+                guildMusicManager.getQueue(guildId, channelId),
+                bot.getLavalinkClient().getOrCreateLink(guildId));
     }
 
-    private String handleLoadResult(LavalinkLoadResult result, GuildMusicQueue queue,
-            Link link, long guildId, long channelId, Member member) {
+    private String handleLoadResult(LavalinkLoadResult result, GuildMusicQueue queue, Link link,
+            long guildId, Member member) {
         String userId = member.getId();
         String userName = member.getEffectiveName();
 
         if (result instanceof TrackLoaded trackLoaded) {
             Track track = trackLoaded.getTrack();
-            TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, userName);
+            int queuePosition = enqueueTrack(queue, link, guildId, track, userId, userName);
+            return buildTrackResponse(track, queuePosition);
+        }
 
-            if (queue.getCurrentTrack() == null) {
-                queue.setCurrentTrack(info);
-                link.createOrUpdatePlayer()
-                        .setTrack(track)
-                        .setPaused(false)
-                        .subscribe();
-                return "🎵 Now playing: **" + info.getTitle() + "** by " + info.getAuthor();
-            } else {
-                queue.enqueue(info);
-                return "➕ Added to queue: **" + info.getTitle() + "** | Position: " + queue.size();
-            }
-
-        } else if (result instanceof PlaylistLoaded playlistLoaded) {
+        if (result instanceof PlaylistLoaded playlistLoaded) {
             List<Track> tracks = playlistLoaded.getTracks();
             if (tracks.isEmpty()) {
                 return "❌ Playlist is empty.";
             }
 
-            boolean startedPlaying = false;
             for (Track track : tracks) {
-                TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, userName);
-                if (queue.getCurrentTrack() == null && !startedPlaying) {
-                    queue.setCurrentTrack(info);
-                    link.createOrUpdatePlayer()
-                            .setTrack(track)
-                            .setPaused(false)
-                            .subscribe();
-                    startedPlaying = true;
-                } else {
-                    queue.enqueue(info);
-                }
+                enqueueTrack(queue, link, guildId, track, userId, userName);
             }
-            return "📋 Loaded playlist: **" + playlistLoaded.getInfo().getName()
-                    + "** with " + tracks.size() + " tracks";
 
-        } else if (result instanceof SearchResult searchResult) {
+            return "📂 Loaded playlist: **" + playlistLoaded.getInfo().getName()
+                    + "** with " + tracks.size() + " tracks.";
+        }
+
+        if (result instanceof SearchResult searchResult) {
             List<Track> tracks = searchResult.getTracks();
             if (tracks.isEmpty()) {
                 return "❌ No results found for your search.";
             }
 
             Track track = tracks.get(0);
-            TrackInfo info = GuildMusicManager.toTrackInfo(track, userId, userName);
+            int queuePosition = enqueueTrack(queue, link, guildId, track, userId, userName);
+            return buildTrackResponse(track, queuePosition);
+        }
 
+        if (result instanceof LoadFailed loadFailed) {
+            return "❌ Failed to load: " + userFriendlyTrackExceptionMessage(loadFailed.getException());
+        }
+
+        return "❌ No matches found.";
+    }
+
+    private boolean processStoredTrackLoadResult(LavalinkLoadResult result, GuildMusicQueue queue, Link link,
+            long guildId, String requesterId, String requesterName) {
+        Track track = extractTrack(result);
+        if (track == null) {
+            if (result instanceof LoadFailed loadFailed) {
+                log.warn("Stored track load failed in guild {}: {}", guildId,
+                        userFriendlyTrackExceptionMessage(loadFailed.getException()));
+            }
+            return false;
+        }
+
+        enqueueTrack(queue, link, guildId, track, requesterId, requesterName);
+        return true;
+    }
+
+    private Track extractTrack(LavalinkLoadResult result) {
+        if (result instanceof TrackLoaded trackLoaded) {
+            return trackLoaded.getTrack();
+        }
+
+        if (result instanceof SearchResult searchResult && !searchResult.getTracks().isEmpty()) {
+            return searchResult.getTracks().get(0);
+        }
+
+        if (result instanceof PlaylistLoaded playlistLoaded && !playlistLoaded.getTracks().isEmpty()) {
+            return playlistLoaded.getTracks().get(0);
+        }
+
+        return null;
+    }
+
+    private int enqueueTrack(GuildMusicQueue queue, Link link, long guildId, Track track,
+            String requesterId, String requesterName) {
+        TrackInfo info = GuildMusicManager.toTrackInfo(track, requesterId, requesterName);
+        boolean startNow;
+        int queuePosition = 0;
+
+        synchronized (queue) {
             if (queue.getCurrentTrack() == null) {
                 queue.setCurrentTrack(info);
-                link.createOrUpdatePlayer()
-                        .setTrack(track)
-                        .setPaused(false)
-                        .subscribe();
-                return "🎵 Now playing: **" + info.getTitle() + "** by " + info.getAuthor();
+                startNow = true;
             } else {
                 queue.enqueue(info);
-                return "➕ Added to queue: **" + info.getTitle() + "** | Position: " + queue.size();
+                queuePosition = queue.size();
+                startNow = false;
             }
-
-        } else if (result instanceof LoadFailed loadFailed) {
-            return "❌ Failed to load: " + loadFailed.getException().getMessage();
-
-        } else {
-            return "❌ No matches found.";
         }
+
+        if (startNow) {
+            startTrack(link, guildId, track);
+        }
+
+        return queuePosition;
+    }
+
+    private void startTrack(Link link, long guildId, Track track) {
+        link.createOrUpdatePlayer()
+                .setTrack(track)
+                .setPaused(false)
+                .subscribe(
+                        ignored -> log.debug("Started track '{}' in guild {}", track.getInfo().getTitle(), guildId),
+                        error -> log.error("Failed to start track '{}' in guild {}: {}",
+                                track.getInfo().getTitle(), guildId, error.getMessage(), error));
+    }
+
+    private String buildTrackResponse(Track track, int queuePosition) {
+        if (queuePosition == 0) {
+            return "🎵 Now playing: **" + track.getInfo().getTitle() + "** by " + track.getInfo().getAuthor();
+        }
+        return "➡️ Added to queue: **" + track.getInfo().getTitle() + "** | Position: " + queuePosition;
+    }
+
+    private String normalizeQuery(String query) {
+        if (!query.startsWith("http://") && !query.startsWith("https://")) {
+            return "ytsearch:" + query;
+        }
+        return stripYoutubeMixParams(query);
+    }
+
+    private String userFriendlyErrorMessage(Throwable error) {
+        Throwable root = error;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+
+        if (root instanceof TimeoutException || root instanceof InterruptedIOException) {
+            return "Lavalink did not respond in time.";
+        }
+        if (root instanceof IOException) {
+            return "The Lavalink request was canceled or interrupted.";
+        }
+
+        String message = root.getMessage();
+        return (message == null || message.isBlank()) ? "Unexpected Lavalink error." : message;
+    }
+
+    private String userFriendlyTrackExceptionMessage(TrackException error) {
+        if (error == null) {
+            return "Unexpected Lavalink error.";
+        }
+
+        String message = error.getMessage();
+        return (message == null || message.isBlank()) ? "Unexpected Lavalink error." : message;
     }
 
     /**
@@ -243,7 +307,7 @@ public class MusicService {
     public String stop(Guild guild, Member member) {
         GuildVoiceState voiceState = member.getVoiceState();
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+            return "鉂?You must be in a voice channel to use this command!";
         }
 
         long guildId = guild.getIdLong();
@@ -251,7 +315,7 @@ public class MusicService {
 
         BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
         if (bot == null) {
-            return "❌ No bot is playing in your channel.";
+            return "鉂?No bot is playing in your channel.";
         }
 
         GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
@@ -266,7 +330,7 @@ public class MusicService {
         bot.getJda().getDirectAudioController().disconnect(guild);
         guildMusicManager.cleanup(guildId, channelId);
 
-        return "⏹️ Stopped playback and cleared the queue.";
+        return "鈴癸笍 Stopped playback and cleared the queue.";
     }
 
     /**
@@ -275,7 +339,7 @@ public class MusicService {
     public String next(Guild guild, Member member) {
         GuildVoiceState voiceState = member.getVoiceState();
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+            return "鉂?You must be in a voice channel to use this command!";
         }
 
         long guildId = guild.getIdLong();
@@ -283,7 +347,7 @@ public class MusicService {
 
         BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
         if (bot == null) {
-            return "❌ No bot is playing in your channel.";
+            return "鉂?No bot is playing in your channel.";
         }
 
         GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
@@ -294,7 +358,7 @@ public class MusicService {
                     .createOrUpdatePlayer()
                     .setTrack(null)
                     .subscribe();
-            return "⏭️ No more tracks in queue. Playback stopped.";
+            return "鈴笍 No more tracks in queue. Playback stopped.";
         }
 
         queue.setCurrentTrack(next);
@@ -304,7 +368,7 @@ public class MusicService {
                 .setPaused(false)
                 .subscribe();
 
-        return "⏭️ Skipped! Now playing: **" + next.getTitle() + "**";
+        return "鈴笍 Skipped! Now playing: **" + next.getTitle() + "**";
     }
 
     /**
@@ -313,7 +377,7 @@ public class MusicService {
     public String previous(Guild guild, Member member) {
         GuildVoiceState voiceState = member.getVoiceState();
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+            return "鉂?You must be in a voice channel to use this command!";
         }
 
         long guildId = guild.getIdLong();
@@ -321,13 +385,13 @@ public class MusicService {
 
         BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
         if (bot == null) {
-            return "❌ No bot is playing in your channel.";
+            return "鉂?No bot is playing in your channel.";
         }
 
         GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         TrackInfo prev = queue.popFromHistory();
         if (prev == null) {
-            return "⏮️ No previous tracks in history.";
+            return "鈴笍 No previous tracks in history.";
         }
 
         queue.setCurrentTrack(prev);
@@ -337,7 +401,7 @@ public class MusicService {
                 .setPaused(false)
                 .subscribe();
 
-        return "⏮️ Playing previous: **" + prev.getTitle() + "**";
+        return "鈴笍 Playing previous: **" + prev.getTitle() + "**";
     }
 
     /**
@@ -346,7 +410,7 @@ public class MusicService {
     public String pause(Guild guild, Member member) {
         GuildVoiceState voiceState = member.getVoiceState();
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+            return "鉂?You must be in a voice channel to use this command!";
         }
 
         long guildId = guild.getIdLong();
@@ -354,16 +418,16 @@ public class MusicService {
 
         BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
         if (bot == null) {
-            return "❌ No bot is playing in your channel.";
+            return "鉂?No bot is playing in your channel.";
         }
 
         GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         if (queue.getCurrentTrack() == null) {
-            return "❌ Nothing is playing right now.";
+            return "鉂?Nothing is playing right now.";
         }
 
         if (queue.isPaused()) {
-            return "⏸️ Already paused.";
+            return "鈴革笍 Already paused.";
         }
 
         queue.setPaused(true);
@@ -372,7 +436,7 @@ public class MusicService {
                 .setPaused(true)
                 .subscribe();
 
-        return "⏸️ Paused: **" + queue.getCurrentTrack().getTitle() + "**";
+        return "鈴革笍 Paused: **" + queue.getCurrentTrack().getTitle() + "**";
     }
 
     /**
@@ -381,7 +445,7 @@ public class MusicService {
     public String resume(Guild guild, Member member) {
         GuildVoiceState voiceState = member.getVoiceState();
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            return "❌ You must be in a voice channel to use this command!";
+            return "鉂?You must be in a voice channel to use this command!";
         }
 
         long guildId = guild.getIdLong();
@@ -389,16 +453,16 @@ public class MusicService {
 
         BotInstance bot = guildMusicManager.getBotInChannel(guildId, channelId);
         if (bot == null) {
-            return "❌ No bot is playing in your channel.";
+            return "鉂?No bot is playing in your channel.";
         }
 
         GuildMusicQueue queue = guildMusicManager.getQueue(guildId, channelId);
         if (queue.getCurrentTrack() == null) {
-            return "❌ Nothing is playing right now.";
+            return "鉂?Nothing is playing right now.";
         }
 
         if (!queue.isPaused()) {
-            return "▶️ Already playing.";
+            return "鈻讹笍 Already playing.";
         }
 
         queue.setPaused(false);
@@ -407,7 +471,7 @@ public class MusicService {
                 .setPaused(false)
                 .subscribe();
 
-        return "▶️ Resumed: **" + queue.getCurrentTrack().getTitle() + "**";
+        return "鈻讹笍 Resumed: **" + queue.getCurrentTrack().getTitle() + "**";
     }
 
     /**
@@ -435,5 +499,38 @@ public class MusicService {
             url = url.replaceAll("\\?&", "?");
         }
         return url;
+    }
+
+    private record PlaybackContext(long guildId, long channelId, AudioChannelUnion channel, BotInstance bot,
+            GuildMusicQueue queue, Link link, String failureMessage) {
+        private static PlaybackContext success(long guildId, long channelId, AudioChannelUnion channel,
+                BotInstance bot, GuildMusicQueue queue, Link link) {
+            return new PlaybackContext(guildId, channelId, channel, bot, queue, link, null);
+        }
+
+        private static PlaybackContext failure(String failureMessage) {
+            return new PlaybackContext(0L, 0L, null, null, null, null, failureMessage);
+        }
+    }
+
+    private static final class PlaylistLoadSummary {
+        private int addedCount;
+        private int failedCount;
+
+        private void record(boolean loaded) {
+            if (loaded) {
+                addedCount++;
+                return;
+            }
+            failedCount++;
+        }
+
+        private String toMessage(String playlistName) {
+            String message = "🎶 Loaded **" + addedCount + "** tracks from playlist **" + playlistName + "**.";
+            if (failedCount > 0) {
+                message += " (" + failedCount + " failed to load)";
+            }
+            return message;
+        }
     }
 }
