@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       # Java heap size for Lavalink (adjust if you have more/less RAM)
-      - _JAVA_OPTIONS=-Xmx512m
+      - _JAVA_OPTIONS=-Xmx1g
       - SERVER_PORT=2333
       # Set password explicitly via env var (takes priority over application.yml)
       - LAVALINK_SERVER_PASSWORD=youshallnotpass

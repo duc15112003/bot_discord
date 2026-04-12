@@ -37,7 +37,7 @@ import java.util.concurrent.TimeoutException;
 public class MusicService {
 
     private static final Logger log = LoggerFactory.getLogger(MusicService.class);
-    private static final Duration LAVALINK_LOAD_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration LAVALINK_LOAD_TIMEOUT = Duration.ofSeconds(30);
 
     private final GuildMusicManager guildMusicManager;
     private final PlaylistService playlistService;
@@ -66,6 +66,7 @@ public class MusicService {
 
         return link.loadItem(normalizeQuery(query))
                 .timeout(LAVALINK_LOAD_TIMEOUT)
+                .retry(2)  // Retry up to 2 times on failure
                 .map(result -> {
                     if (result == null) {
                         return "❌ Failed to load track. Please try again.";
@@ -108,6 +109,7 @@ public class MusicService {
         return Flux.fromIterable(dbTracks)
                 .concatMap(dbTrack -> link.loadItem(dbTrack.getUri())
                         .timeout(LAVALINK_LOAD_TIMEOUT)
+                        .retry(2)
                         .map(result -> processStoredTrackLoadResult(result, queue, link, guildId,
                                 requesterId, requesterName))
                         .onErrorResume(error -> {
