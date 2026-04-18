@@ -19,16 +19,20 @@ import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * JDA configuration — creates the primary Discord bot instance
  * and optional secondary bot instances for multi-channel music playback.
  */
 @Configuration
+@ConditionalOnProperty(name = "discord.enabled", havingValue = "true", matchIfMissing = true)
 public class JdaConfig {
 
         private static final Logger log = LoggerFactory.getLogger(JdaConfig.class);
@@ -38,6 +42,9 @@ public class JdaConfig {
 
         @Value("${discord.extra-tokens:}")
         private String extraTokensRaw;
+
+        @Value("${discord.enable-guild-members-intent:false}")
+        private boolean enableGuildMembersIntent;
 
         @Value("${lavalink.nodes[0].uri}")
         private String nodeUri;
@@ -67,13 +74,20 @@ public class JdaConfig {
                 // Create primary bot's LavalinkClient
                 LavalinkClient primaryLavalink = createLavalinkClient(botToken, trackScheduler);
 
+                List<GatewayIntent> intents = new ArrayList<>(List.of(
+                                GatewayIntent.GUILD_VOICE_STATES,
+                                GatewayIntent.GUILD_MESSAGES,
+                                GatewayIntent.GUILD_MESSAGE_REACTIONS));
+
+                if (enableGuildMembersIntent) {
+                        intents.add(GatewayIntent.GUILD_MEMBERS);
+                } else {
+                        log.warn("discord.enable-guild-members-intent=false, member join features are disabled.");
+                }
+
                 // Create primary JDA instance
                 JDA primaryJda = JDABuilder.createDefault(botToken)
-                                .enableIntents(
-                                                GatewayIntent.GUILD_VOICE_STATES,
-                                                GatewayIntent.GUILD_MESSAGES,
-                                                GatewayIntent.GUILD_MESSAGE_REACTIONS,
-                                                GatewayIntent.GUILD_MEMBERS)
+                                .enableIntents(intents)
                                 .enableCache(CacheFlag.VOICE_STATE)
                                 .addEventListeners(
                                                 commandManager,

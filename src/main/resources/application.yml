@@ -20,6 +20,7 @@ spring:
 
 # Discord bot configuration
 discord:
+  enable-guild-members-intent: ${DISCORD_ENABLE_GUILD_MEMBERS_INTENT:false}
   extra-tokens: ${DISCORD_EXTRA_TOKENS:}
 
 # Lavalink audio server configuration
