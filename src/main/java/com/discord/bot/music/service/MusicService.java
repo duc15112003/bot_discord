@@ -360,7 +360,9 @@ public class MusicService {
                     .createOrUpdatePlayer()
                     .setTrack(null)
                     .subscribe();
-            return "鈴笍 No more tracks in queue. Playback stopped.";
+            bot.getJda().getDirectAudioController().disconnect(guild);
+            guildMusicManager.cleanup(guildId, channelId);
+            return "⏭️ No more tracks in queue. Playback stopped and bot left the channel.";
         }
 
         queue.setCurrentTrack(next);

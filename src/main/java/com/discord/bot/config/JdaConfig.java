@@ -6,6 +6,8 @@ import com.discord.bot.music.audio.TrackScheduler;
 import com.discord.bot.music.command.CommandManager;
 import com.discord.bot.music.listener.AutoVoiceListener;
 import com.discord.bot.music.listener.VoiceChannelListener;
+import com.discord.bot.music.listener.MemberJoinListener;
+import com.discord.bot.music.listener.RoleInteractionListener;
 import dev.arbjerg.lavalink.client.Helpers;
 import dev.arbjerg.lavalink.client.LavalinkClient;
 import dev.arbjerg.lavalink.client.NodeOptions;
@@ -50,6 +52,8 @@ public class JdaConfig {
         public JDA jda(CommandManager commandManager,
                         VoiceChannelListener voiceChannelListener,
                         AutoVoiceListener autoVoiceListener,
+                        MemberJoinListener memberJoinListener,
+                        RoleInteractionListener roleInteractionListener,
                         BotInstancePool botInstancePool,
                         TrackScheduler trackScheduler) throws InterruptedException {
 
@@ -68,12 +72,15 @@ public class JdaConfig {
                                 .enableIntents(
                                                 GatewayIntent.GUILD_VOICE_STATES,
                                                 GatewayIntent.GUILD_MESSAGES,
-                                                GatewayIntent.GUILD_MESSAGE_REACTIONS)
+                                                GatewayIntent.GUILD_MESSAGE_REACTIONS,
+                                                GatewayIntent.GUILD_MEMBERS)
                                 .enableCache(CacheFlag.VOICE_STATE)
                                 .addEventListeners(
                                                 commandManager,
                                                 voiceChannelListener,
-                                                autoVoiceListener)
+                                                autoVoiceListener,
+                                                memberJoinListener,
+                                                roleInteractionListener)
                                 .setVoiceDispatchInterceptor(new JDAVoiceUpdateListener(primaryLavalink))
                                 .build();
 

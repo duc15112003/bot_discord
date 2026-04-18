@@ -26,3 +26,4 @@ logging:
     root: ${env.logging.root:INFO}
     com.discord: ${env.logging.com-discord:INFO}
     dev.arbjerg.lavalink: ${env.logging.lavalink:INFO}
+

@@ -78,37 +78,19 @@ public class PlaylistService {
     }
 
     /**
-     * List all playlists for a user with track counts.
+     * Get all playlists for a user.
      */
     @Transactional(readOnly = true)
-    public String listPlaylists(String userId) {
-        List<Playlist> playlists = playlistRepository.findByUserId(userId);
+    public List<Playlist> getUserPlaylists(String userId) {
+        return playlistRepository.findByUserId(userId);
+    }
 
-        if (playlists.isEmpty()) {
-            return "📋 You don't have any playlists yet. Use `/playlist-add` to create one!";
-        }
-
-        StringBuilder sb = new StringBuilder("📋 **Your Playlists:**\n\n");
-        for (int i = 0; i < playlists.size(); i++) {
-            Playlist pl = playlists.get(i);
-            int trackCount = playlistTrackRepository.countByPlaylistId(pl.getId());
-            sb.append(String.format("`%d.` **%s** — %d track%s\n",
-                    i + 1, pl.getName(), trackCount, trackCount == 1 ? "" : "s"));
-
-            // Show tracks in this playlist
-            List<PlaylistTrack> tracks = playlistTrackRepository
-                    .findByPlaylistIdOrderByPositionAsc(pl.getId());
-            for (PlaylistTrack track : tracks) {
-                long minutes = track.getDurationMs() / 60000;
-                long seconds = (track.getDurationMs() % 60000) / 1000;
-                sb.append(String.format("   ↳ `%d.` %s — %s (`%d:%02d`)\n",
-                        track.getPosition(), track.getTitle(), track.getAuthor(),
-                        minutes, seconds));
-            }
-            sb.append("\n");
-        }
-
-        return sb.toString();
+    /**
+     * Get track count for a given playlist.
+     */
+    @Transactional(readOnly = true)
+    public int getTrackCount(Long playlistId) {
+        return playlistTrackRepository.countByPlaylistId(playlistId);
     }
 
     /**

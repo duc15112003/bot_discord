@@ -109,6 +109,17 @@ public class TrackScheduler {
         } else {
             queue.setCurrentTrack(null);
             log.info("Queue empty in guild {} channel {}, playback stopped", guildId, channelId);
+            
+            bot.getLavalinkClient().getOrCreateLink(guildId)
+                    .createOrUpdatePlayer()
+                    .setTrack(null)
+                    .subscribe();
+
+            net.dv8tion.jda.api.entities.Guild guild = bot.getJda().getGuildById(guildId);
+            if (guild != null) {
+                bot.getJda().getDirectAudioController().disconnect(guild);
+            }
+            guildMusicManager.cleanup(guildId, channelId);
         }
     }
 }

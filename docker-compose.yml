@@ -41,7 +41,7 @@ services:
       MARIADB_USER: bot_user
       MARIADB_PASSWORD: bot_password
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - ./data/mysql:/var/lib/mysql
     networks:
@@ -78,4 +78,3 @@ networks:
     name: lavalink
   mysql:
     name: mysql
-
