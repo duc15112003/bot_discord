@@ -50,3 +50,6 @@ logs/
 package-configuration-*.json
 package-override.yaml
 product-config.yaml
+
+### Local Data ###
+data/mysql/
