@@ -23,7 +23,14 @@ app:
   jwt:
     secret: ${env.jwt.secret}
     expiration: ${env.jwt.expiration:3600000}
-
+  ai:
+    enabled: ${env.ai.enabled:${AI_ENABLED:false}}
+    provider: ${env.ai.provider:${AI_PROVIDER:gemini}}
+    apiKey: ${env.ai.apiKey:${AI_API_KEY:}}
+    apiUrl: ${env.ai.apiUrl:${AI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}}
+    model: ${env.ai.model:${AI_MODEL:gemini-2.5-flash}}
+    timeoutMs: ${env.ai.timeoutMs:${AI_TIMEOUT_MS:45000}}
+    retryAttempts: ${env.ai.retryAttempts:${AI_RETRY_ATTEMPTS:5}}
 logging:
   level:
     root: ${env.logging.root:INFO}

@@ -17,6 +17,7 @@ public class AppProperties {
     private Jwt jwt = new Jwt();
     private Features features = new Features();
     private Integration integration = new Integration();
+    private Ai ai = new Ai();
 
     public Jwt getJwt() {
         return jwt;
@@ -40,6 +41,14 @@ public class AppProperties {
 
     public void setIntegration(Integration integration) {
         this.integration = integration;
+    }
+
+    public Ai getAi() {
+        return ai;
+    }
+
+    public void setAi(Ai ai) {
+        this.ai = ai;
     }
 
     /**
@@ -136,4 +145,77 @@ public class AppProperties {
             this.vendorUrl = vendorUrl;
         }
     }
+
+    /**
+     * AI service configuration - for calling external AI APIs.
+     */
+    public static class Ai {
+
+        private boolean enabled = false;
+        private String provider = "gemini"; // gemini
+        private String apiKey = "";
+        private String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+        /** Gemini model hint; endpoint model in apiUrl takes precedence. */
+        private String model = "gemini-2.5-flash";
+        private int timeoutMs = 45000;
+        private int retryAttempts = 5;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getApiUrl() {
+            return apiUrl;
+        }
+
+        public void setApiUrl(String apiUrl) {
+            this.apiUrl = apiUrl;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public void setModel(String model) {
+            this.model = model;
+        }
+
+        public int getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(int timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+
+        public int getRetryAttempts() {
+            return retryAttempts;
+        }
+
+        public void setRetryAttempts(int retryAttempts) {
+            this.retryAttempts = retryAttempts;
+        }
+    }
 }
+
+

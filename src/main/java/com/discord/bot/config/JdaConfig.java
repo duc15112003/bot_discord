@@ -7,6 +7,7 @@ import com.discord.bot.music.command.CommandManager;
 import com.discord.bot.music.listener.AutoVoiceListener;
 import com.discord.bot.music.listener.VoiceChannelListener;
 import com.discord.bot.music.listener.MemberJoinListener;
+import com.discord.bot.music.listener.PlaySearchInteractionListener;
 import com.discord.bot.music.listener.RoleInteractionListener;
 import dev.arbjerg.lavalink.client.Helpers;
 import dev.arbjerg.lavalink.client.LavalinkClient;
@@ -60,6 +61,7 @@ public class JdaConfig {
                         VoiceChannelListener voiceChannelListener,
                         AutoVoiceListener autoVoiceListener,
                         MemberJoinListener memberJoinListener,
+                        PlaySearchInteractionListener playSearchInteractionListener,
                         RoleInteractionListener roleInteractionListener,
                         BotInstancePool botInstancePool,
                         TrackScheduler trackScheduler) throws InterruptedException {
@@ -94,6 +96,7 @@ public class JdaConfig {
                                                 voiceChannelListener,
                                                 autoVoiceListener,
                                                 memberJoinListener,
+                                                playSearchInteractionListener,
                                                 roleInteractionListener)
                                 .setVoiceDispatchInterceptor(new JDAVoiceUpdateListener(primaryLavalink))
                                 .build();

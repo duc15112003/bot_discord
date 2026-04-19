@@ -81,6 +81,37 @@ public class MusicService {
     }
 
     /**
+     * Like {@link #playAsync} but if Lavalink fails on the primary query (bad YouTube URL, etc.),
+     * retries once with {@code searchFallback} (plain text → ytsearch).
+     */
+    public Mono<String> playAsyncWithYoutubeSearchFallback(Guild guild, Member member,
+            String primaryQuery, String searchFallback) {
+        return playAsync(guild, member, primaryQuery)
+                .flatMap(msg -> {
+                    if (!needsPlaysearchFallbackRetry(msg)
+                            || searchFallback == null
+                            || searchFallback.isBlank()) {
+                        return Mono.just(msg);
+                    }
+                    String p = primaryQuery != null ? primaryQuery.trim() : "";
+                    String f = searchFallback.trim();
+                    if (f.equalsIgnoreCase(p)) {
+                        return Mono.just(msg);
+                    }
+                    log.info("Playback failed ({}), retrying with search fallback", msg);
+                    return playAsync(guild, member, f);
+                });
+    }
+
+    private static boolean needsPlaysearchFallbackRetry(String message) {
+        if (message == null) {
+            return false;
+        }
+        return message.startsWith("❌ Failed to load")
+                || message.contains("No results found");
+    }
+
+    /**
      * Play all tracks from a stored playlist without blocking the interaction
      * thread.
      */

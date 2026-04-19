@@ -30,6 +30,16 @@ lavalink:
       password: ${LAVALINK_PASSWORD:youshallnotpass}
       name: main-node
 
+# AI service configuration for music request parsing
+app:
+  ai:
+    enabled: ${AI_ENABLED:true}
+    provider: ${AI_PROVIDER:gemini}
+    apiKey: ${AI_API_KEY:}
+    apiUrl: ${AI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}
+    timeoutMs: ${AI_TIMEOUT_MS:10000}
+    retryAttempts: ${AI_RETRY_ATTEMPTS:2}
+
 logging:
   level:
     sun.rmi: WARN

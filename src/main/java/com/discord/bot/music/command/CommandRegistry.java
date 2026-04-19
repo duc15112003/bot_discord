@@ -47,7 +47,7 @@ public class CommandRegistry {
      */
     private String categorizeCommand(String commandName) {
         return switch (commandName) {
-            case "play", "stop", "next", "pre", "pause", "resume" -> "🎶 Music Controls";
+            case "play", "playsearch", "stop", "next", "pre", "pause", "resume" -> "🎶 Music Controls";
             case "playlist-add", "playlist-list", "playlist-remove" -> "📋 Playlist Management";
             case "set-create-channel" -> "🎙️ Temporary Voice Channels";
             case "autovoice" -> {
@@ -65,6 +65,7 @@ public class CommandRegistry {
         return switch (commandName) {
             // Music Controls
             case "play" -> "Play a song (YouTube search or URL)";
+            case "playsearch" -> "AI suggests tracks; pick one from the menu to play";
             case "stop" -> "Stop playback, clear queue, leave channel";
             case "next" -> "Skip to the next track";
             case "pre" -> "Play the previous track from history";

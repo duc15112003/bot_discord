@@ -22,6 +22,14 @@
             "root": "INFO",
             "com-discord": "INFO",
             "lavalink": "INFO"
+        },
+        "ai": {
+            "enabled": true,
+            "provider": "gemini",
+            "apiKey": "",
+            "apiUrl": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            "timeoutMs": 10000,
+            "retryAttempts": 2
         }
     }
 }

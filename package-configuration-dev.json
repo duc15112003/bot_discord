@@ -30,6 +30,15 @@
             "root": "DEBUG",
             "com-discord": "DEBUG",
             "lavalink": "DEBUG"
+        },
+        "ai": {
+            "enabled": false,
+            "provider": "cohere",
+            "apiKey": "${AI_API_KEY:}",
+            "apiUrl": "https://api.cohere.com/v2/chat",
+            "model": "command-a-03-2025",
+            "timeoutMs": 45000,
+            "retryAttempts": 5
         }
     }
 }
