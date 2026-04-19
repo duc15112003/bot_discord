@@ -24,7 +24,7 @@ app:
     # package-configuration-{profile}.json -> flattened env.ai.* (same pattern as env.jwt.*)
     enabled: ${env.ai.enabled:${AI_ENABLED:true}}
     provider: ${env.ai.provider:${AI_PROVIDER:gemini}}
-    apiKey: ${env.ai.apiKey:AIzaSyDy3MCLFcokINuEWRY4TTXmYIfgIlS0IYg}
+    apiKey: ${env.ai.apiKey}
     apiUrl: ${env.ai.apiUrl:${AI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}}
     model: ${env.ai.model:${AI_MODEL:gemini-2.5-flash}}
     timeoutMs: ${env.ai.timeoutMs:${AI_TIMEOUT_MS:45000}}
